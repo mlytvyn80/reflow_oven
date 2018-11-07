@@ -230,6 +230,17 @@ extern void lcd_puts(const char *s);
 
 
 /**
+ @brief    Display string without auto linefeed
+ @param    row1 string to be displayed in row1 
+ @param    row2 string to be displayed in row2
+ @return   none
+*/
+extern void lcd_put_two_rows(const char *row1, const char *row2);
+
+extern void lcd_put_two_rows_animate(const char *row1, const char *row2);
+
+
+/**
  @brief    Display string from program memory without auto linefeed
  @param    s string from program memory be be displayed                                        
  @return   none

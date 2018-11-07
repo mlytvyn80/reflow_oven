@@ -336,7 +336,7 @@ uint8_t usb_configured(void)
 }
 
 // get the next character, or -1 if nothing received
-int16_t usb_serial_getchar(void)
+int8_t usb_serial_getchar(void)
 {
     uint8_t c, intr_state;
 

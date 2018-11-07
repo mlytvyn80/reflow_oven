@@ -8,7 +8,7 @@ void usb_init(void);			// initialize everything
 uint8_t usb_configured(void);		// is the USB port configured
 
 // receiving data
-int16_t usb_serial_getchar(void);	// receive a character (-1 if timeout/error)
+int8_t usb_serial_getchar(void);	// receive a character (-1 if timeout/error)
 uint8_t usb_serial_available(void);	// number of bytes in receive buffer
 void usb_serial_flush_input(void);	// discard any buffered input
 
