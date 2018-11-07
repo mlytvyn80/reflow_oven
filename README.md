@@ -9,7 +9,7 @@ The firmware can be compiled using make utility.
 make all
 ```
 
-Some more make targets are supported, namely all, clean, coff extcodd program, debug.
+Some more make targets are supported, namely *all, clean, coff extcodd program, debug.*
 Please consult the Makefile for usage details.
 
 
@@ -53,7 +53,7 @@ avrdude -c usbasp -p m32u4 -U hfuse:w:0xdd:m -U lfuse:w:0xde:m -U efuse:w:0xcf:m
 
 ## Authors
 
-* **Billie Thompson** - *Initial work* - [PurpleBooth](https://github.com/PurpleBooth)
+* **Daniel Strother** - *Initial work* - [danstrother.com](https://danstrother.com/2011/01/15/reflow-oven-controller/)
 * **Oleg Artamonov** - *PCB Design*  - [olegart.ru](http://olegart.ru/wordpress/reflow-soldering/)
 * **Mykhailo Lytvyn** - Collect all necessary build-related information together.
 
