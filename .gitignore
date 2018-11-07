@@ -1,0 +1,9 @@
+*.o
+*.lst
+firmware/.dep/*
+firmware/ovencon.eep
+firmware/ovencon.elf
+firmware/ovencon.hex
+firmware/ovencon.lss
+firmware/ovencon.map
+firmware/ovencon.sym
