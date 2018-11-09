@@ -100,7 +100,7 @@ volatile uint8_t comm_cmd;
 #define ST_RUN      2
 #define ST_DONE     3
 #define ST_PAUSE    4
-#define ST_MANUAL	5
+#define ST_MANUAL   5
 
 const char *state_names[6] = { "Fault", "Idle", "Run", "Done", "Pause", "Manual" };
 
@@ -180,10 +180,7 @@ void oven_update_120hz(void)
 
                     if (fw_update)
                     {
-                        lcd_clrscr();
-                        lcd_puts("FIRMWARE UPDATE");
-                        lcd_gotoxy(0, 1);
-                        lcd_puts("Atmel FLIP v/USB");
+                        lcd_put_two_rows("FIRMWARE UPDATE", "Atmel FLIP v/USB");
                         usb_serial_flush_output();
                         Jump_To_Bootloader();
                     }
@@ -350,7 +347,7 @@ void oven_update_4hz(void)
                 buzzer = 8;
             }
             if ((target - temp) > 100) // 25 *C difference
-                state = ST_FAULT;
+                fault();
             break;
         case ST_PAUSE:
             rled_on();
@@ -452,7 +449,9 @@ void oven_update_4hz(void)
 
         if (state == ST_FAULT)
         {
-            lcd_puts("CHECK TH.COUPLE!");
+            sprintf_P(lcd_str, PSTR("TG%d%cC T%d%cC"), target>>2, lcd_degree, temp>>2, lcd_degree);
+            
+            lcd_put_two_rows("CHECK TH.COUPLE!", lcd_str);                        
         }
 
         if (state == ST_PAUSE)
@@ -490,13 +489,9 @@ void process_message(const char *msg)
         comm_cmd = CMD_PAUSE;
     } else if(strcmp_P(msg,PSTR("resume")) == 0) {
         comm_cmd = CMD_RESUME;
-    } else if(strcmp_P(msg,PSTR("update")) == 0) { // update firmware via USB
-        lcd_clrscr();
-        lcd_puts("FIRMWARE UPDATE");
-        lcd_gotoxy(0, 1);
-        lcd_puts("RESTART TO ABORT");
-        resplen = sprintf_P(response, PSTR("* Update firmware with Atmel FLIP"));
-        usb_serial_write((void*)response, resplen);
+    } else if(strcmp_P(msg,PSTR("update")) == 0) { // update firmware via USB        
+        lcd_put_two_rows("FIRMWARE UPDATE", "RESTART TO ABORT");
+        usb_serial_write((void*)"* Update firmware with Atmel FLIP", 33);
         usb_serial_flush_output();
         Jump_To_Bootloader();
     } else if(sscanf_P(msg,PSTR("coeff: %d"), &eeprom_data)) { // TH couple correction coefficient, default 31
@@ -516,8 +511,7 @@ void process_message(const char *msg)
     }
 }
 
-// program entry point
-int main(void)
+void avr_init(void)
 {
     // If the reset source was the bootloader and the key is correct, clear it and jump to the bootloader
     if ((MCUSR & (1<<WDRF)) && (Boot_Key == MAGIC_BOOT_KEY))
@@ -535,69 +529,36 @@ int main(void)
     // LED status lights
     DDRD |= (1<<PD5)|(1<<PD6)|(1<<PD7);
     DDRD |= (1<<PD3);
-
+    
     rled_on();
     relay_off();
-
-    int16_t ret;
-    char c;
-
-    // initialize usb
+    
     usb_init();
+}
 
-    // initialize LCD
+void show_greetings_msg(void)
+{
+    lcd_clrscr();
+
+    lcd_put_two_rows_animate("REFLOW  OVEN", " CONTROLLER ");
+    _delay_ms(500);
+    
+    lcd_put_two_rows_animate("Mykhailo Lytvyn", "   lytvyn.at   ");
+    _delay_ms(500);
+
+    lcd_put_two_rows("FIRMWARE VERSION", VERSION);
+
+}
+
+// program entry point
+int main(void)
+{
+    avr_init();
+    
     lcd_init(LCD_DISP_ON);
-    lcd_clrscr();
-
-    lcd_gotoxy(2, 0);
-    uint8_t x = 2;
-    char text1 [15] = "REFLOW  OVEN";
-    char text2 [15] = " CONTROLLER ";
-    for (uint8_t i=0; i<12; i++)
-    {
-        lcd_gotoxy(x, 0);
-        lcd_puts("   ");
-        lcd_gotoxy(x, 0);
-        lcd_putc(text1[i]);
-
-        lcd_gotoxy(x, 1);
-        lcd_puts("   ");
-        lcd_gotoxy(x, 1);
-        lcd_putc(text2[i]);
-        x++;
-        _delay_ms(50);
-    }
-
-    _delay_ms(500);
-
-    lcd_clrscr();
-    lcd_gotoxy(0, 0);
-    x = 0;
-    strcpy(text1, "Mykhailo Lytvyn");
-    strcpy(text2, "   lytvyn.at   ");
-    for (uint8_t i=0; i<15; i++)
-    {
-        lcd_gotoxy(x, 0);
-        lcd_puts("   ");
-        lcd_gotoxy(x, 0);
-        lcd_putc(text1[i]);
-
-        lcd_gotoxy(x, 1);
-        lcd_puts("   ");
-        lcd_gotoxy(x, 1);
-        lcd_putc(text2[i]);
-        x++;
-        _delay_ms(50);
-    }
-
-    _delay_ms(500);
-
-    lcd_clrscr();
-    lcd_puts("FIRMWARE VERSION");
-    lcd_gotoxy(0, 1);
-    lcd_puts(VERSION);
-
-    // initialize
+    
+    show_greetings_msg();
+    
     oven_setup();
 
     // wait an arbitrary bit for the host to complete its side of the init
@@ -611,27 +572,29 @@ int main(void)
     
     rx_cnt = 0;
 
-    // run forever
+    int8_t ret;
     while(1)
     {
         // receive individual characters from the host
         while( (ret = usb_serial_getchar()) != -1)
         {
             // all commands are terminated with a new-line
-            c = ret;
-            if(c == '\n') {
+            if(ret == '\n') 
+            {
                 // only process commands that haven't overflowed the buffer
-                if(rx_cnt > 0 && rx_cnt < 255) {
+                if(rx_cnt > 0 && rx_cnt < 255) 
+                {
                     rx_msg[rx_cnt] = '\0';
                     process_message(rx_msg);
                 }
                 rx_cnt = 0;
             } else {
                 // buffer received characters
-                rx_msg[rx_cnt] = c;
+                rx_msg[rx_cnt] = ret;
                 if(rx_cnt != 255) rx_cnt++;
             }
         }
     }
 }
+
 

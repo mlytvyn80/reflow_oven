@@ -495,6 +495,40 @@ void lcd_puts(const char *s)
 }/* lcd_puts */
 
 
+void lcd_put_two_rows(const char *row1, const char *row2)
+{    
+    lcd_clrscr();
+    lcd_puts(row1);
+    lcd_gotoxy(0, 1);
+    lcd_puts(row2);    
+}
+
+
+void lcd_put_two_rows_animate(const char *row1, const char *row2)
+{
+    lcd_clrscr();
+    lcd_gotoxy(0, 0);
+    
+    uint8_t delay_ms = 50;
+    
+    for (uint8_t i=0; i<15; i++)
+    {
+        lcd_gotoxy(i, 0);
+        lcd_puts("   ");
+        lcd_gotoxy(i, 0);
+        lcd_putc(row1[i]);
+        
+        lcd_gotoxy(i, 1);
+        lcd_puts("   ");
+        lcd_gotoxy(i, 1);
+        lcd_putc(row2[i]);
+
+        delay(delay_ms);
+    }
+
+
+}
+
 /*************************************************************************
 Display string from program memory without auto linefeed 
 Input:     string from program memory be be displayed                                        

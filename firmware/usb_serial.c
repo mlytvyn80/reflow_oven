@@ -1,6 +1,6 @@
 /* USB Serial Example for Teensy USB Development Board
  * http://www.pjrc.com/teensy/
- * Copyright (c) 2008,2010 PJRC.COM, LLC
+ * Copyright (c) 2008,2010,2011 PJRC.COM, LLC
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -28,6 +28,7 @@
 // Version 1.4: added usb_serial_write
 // Version 1.5: add support for Teensy 2.0
 // Version 1.6: fix zero length packet bug
+// Version 1.7: fix usb_serial_set_control
 
 #define USB_SERIAL_PRIVATE_INCLUDE
 #include "usb_serial.h"
@@ -145,7 +146,7 @@ static const uint8_t PROGMEM endpoint_config_table[] = {
 // in here should only be done by those who've read chapter 9 of the USB
 // spec and relevant portions of any USB class specifications!
 
-static uint8_t PROGMEM device_descriptor[] = {
+static const uint8_t PROGMEM device_descriptor[] = {
     18,					// bLength
     1,					// bDescriptorType
     0x00, 0x02,				// bcdUSB
@@ -163,16 +164,16 @@ static uint8_t PROGMEM device_descriptor[] = {
 };
 
 #define CONFIG1_DESC_SIZE (9+9+5+5+4+5+7+9+7+7)
-static uint8_t PROGMEM config1_descriptor[CONFIG1_DESC_SIZE] = {
+static const uint8_t PROGMEM config1_descriptor[CONFIG1_DESC_SIZE] = {
     // configuration descriptor, USB spec 9.6.3, page 264-266, Table 9-10
     9, 					// bLength;
     2,					// bDescriptorType;
-    LSB(CONFIG1_DESC_SIZE),			// wTotalLength
+    LSB(CONFIG1_DESC_SIZE),		// wTotalLength
     MSB(CONFIG1_DESC_SIZE),
     2,					// bNumInterfaces
     1,					// bConfigurationValue
     0,					// iConfiguration
-    0xC0,					// bmAttributes
+    0xC0,				// bmAttributes
     50,					// bMaxPower
     // interface descriptor, USB spec 9.6.5, page 267-269, Table 9-12
     9,					// bLength
@@ -180,37 +181,37 @@ static uint8_t PROGMEM config1_descriptor[CONFIG1_DESC_SIZE] = {
     0,					// bInterfaceNumber
     0,					// bAlternateSetting
     1,					// bNumEndpoints
-    0x02,					// bInterfaceClass
-    0x02,					// bInterfaceSubClass
-    0x01,					// bInterfaceProtocol
+    0x02,				// bInterfaceClass
+    0x02,				// bInterfaceSubClass
+    0x01,				// bInterfaceProtocol
     0,					// iInterface
     // CDC Header Functional Descriptor, CDC Spec 5.2.3.1, Table 26
     5,					// bFunctionLength
-    0x24,					// bDescriptorType
-    0x00,					// bDescriptorSubtype
+    0x24,				// bDescriptorType
+    0x00,				// bDescriptorSubtype
     0x10, 0x01,				// bcdCDC
     // Call Management Functional Descriptor, CDC Spec 5.2.3.2, Table 27
     5,					// bFunctionLength
-    0x24,					// bDescriptorType
-    0x01,					// bDescriptorSubtype
-    0x01,					// bmCapabilities
+    0x24,				// bDescriptorType
+    0x01,				// bDescriptorSubtype
+    0x01,				// bmCapabilities
     1,					// bDataInterface
     // Abstract Control Management Functional Descriptor, CDC Spec 5.2.3.3, Table 28
     4,					// bFunctionLength
-    0x24,					// bDescriptorType
-    0x02,					// bDescriptorSubtype
-    0x06,					// bmCapabilities
+    0x24,				// bDescriptorType
+    0x02,				// bDescriptorSubtype
+    0x06,				// bmCapabilities
     // Union Functional Descriptor, CDC Spec 5.2.3.8, Table 33
     5,					// bFunctionLength
-    0x24,					// bDescriptorType
-    0x06,					// bDescriptorSubtype
+    0x24,				// bDescriptorType
+    0x06,				// bDescriptorSubtype
     0,					// bMasterInterface
     1,					// bSlaveInterface0
     // endpoint descriptor, USB spec 9.6.6, page 269-271, Table 9-13
     7,					// bLength
     5,					// bDescriptorType
     CDC_ACM_ENDPOINT | 0x80,		// bEndpointAddress
-    0x03,					// bmAttributes (0x03=intr)
+    0x03,				// bmAttributes (0x03=intr)
     CDC_ACM_SIZE, 0,			// wMaxPacketSize
     64,					// bInterval
     // interface descriptor, USB spec 9.6.5, page 267-269, Table 9-12
@@ -219,23 +220,23 @@ static uint8_t PROGMEM config1_descriptor[CONFIG1_DESC_SIZE] = {
     1,					// bInterfaceNumber
     0,					// bAlternateSetting
     2,					// bNumEndpoints
-    0x0A,					// bInterfaceClass
-    0x00,					// bInterfaceSubClass
-    0x00,					// bInterfaceProtocol
+    0x0A,				// bInterfaceClass
+    0x00,				// bInterfaceSubClass
+    0x00,				// bInterfaceProtocol
     0,					// iInterface
     // endpoint descriptor, USB spec 9.6.6, page 269-271, Table 9-13
     7,					// bLength
     5,					// bDescriptorType
     CDC_RX_ENDPOINT,			// bEndpointAddress
-    0x02,					// bmAttributes (0x02=bulk)
-    CDC_RX_SIZE, 0,				// wMaxPacketSize
+    0x02,				// bmAttributes (0x02=bulk)
+    CDC_RX_SIZE, 0,			// wMaxPacketSize
     0,					// bInterval
     // endpoint descriptor, USB spec 9.6.6, page 269-271, Table 9-13
     7,					// bLength
     5,					// bDescriptorType
-    CDC_TX_ENDPOINT | 0x80,			// bEndpointAddress
-    0x02,					// bmAttributes (0x02=bulk)
-    CDC_TX_SIZE, 0,				// wMaxPacketSize
+    CDC_TX_ENDPOINT | 0x80,		// bEndpointAddress
+    0x02,				// bmAttributes (0x02=bulk)
+    CDC_TX_SIZE, 0,			// wMaxPacketSize
     0					// bInterval
 };
 
@@ -247,22 +248,22 @@ struct usb_string_descriptor_struct {
         uint8_t bDescriptorType;
         int16_t wString[];
 };
-static struct usb_string_descriptor_struct PROGMEM string0 = {
+static const struct usb_string_descriptor_struct PROGMEM string0 = {
         4,
         3,
 {0x0409}
 };
-static struct usb_string_descriptor_struct PROGMEM string1 = {
+static const struct usb_string_descriptor_struct PROGMEM string1 = {
         sizeof(STR_MANUFACTURER),
         3,
         STR_MANUFACTURER
 };
-static struct usb_string_descriptor_struct PROGMEM string2 = {
+static const struct usb_string_descriptor_struct PROGMEM string2 = {
         sizeof(STR_PRODUCT),
         3,
         STR_PRODUCT
 };
-static struct usb_string_descriptor_struct PROGMEM string3 = {
+static const struct usb_string_descriptor_struct PROGMEM string3 = {
         sizeof(STR_SERIAL_NUMBER),
         3,
         STR_SERIAL_NUMBER
@@ -270,7 +271,7 @@ static struct usb_string_descriptor_struct PROGMEM string3 = {
 
 // This table defines which descriptor data is sent for each specific
 // request from the host (in wValue and wIndex).
-static struct descriptor_list_struct {
+static const struct descriptor_list_struct {
         uint16_t	wValue;
         uint16_t	wIndex;
         const uint8_t	*addr;
@@ -316,10 +317,10 @@ static uint8_t cdc_line_rtsdtr=0;
 void usb_init(void)
 {
     HW_CONFIG();
-    USB_FREEZE();				// enable USB
-    PLL_CONFIG();				// config PLL, 16 MHz xtal
+    USB_FREEZE();			// enable USB
+    PLL_CONFIG();			// config PLL, 16 MHz xtal
     while (!(PLLCSR & (1<<PLOCK))) ;	// wait for PLL lock
-    USB_CONFIG();				// start USB clock
+    USB_CONFIG();			// start USB clock
     UDCON = 0;				// enable attach resistor
     usb_configuration = 0;
     cdc_line_rtsdtr = 0;
@@ -335,7 +336,7 @@ uint8_t usb_configured(void)
 }
 
 // get the next character, or -1 if nothing received
-int16_t usb_serial_getchar(void)
+int8_t usb_serial_getchar(void)
 {
     uint8_t c, intr_state;
 
@@ -645,7 +646,9 @@ void usb_serial_flush_output(void)
 // communication
 uint32_t usb_serial_get_baud(void)
 {
-    return *(uint32_t *)cdc_line_coding;
+    const uint32_t *p = (const uint32_t *)cdc_line_coding;
+    
+    return *p;
 }
 uint8_t usb_serial_get_stopbits(void)
 {
@@ -669,8 +672,6 @@ uint8_t usb_serial_get_control(void)
 // it remains buffered (either here or on the host) and can not be
 // lost because you weren't listening at the right time, like it
 // would in real serial communication.
-// TODO: this function is untested.  Does it work?  Please email
-// paul@pjrc.com if you have tried it....
 int8_t usb_serial_set_control(uint8_t signals)
 {
     uint8_t intr_state;
@@ -695,9 +696,9 @@ int8_t usb_serial_set_control(uint8_t signals)
     UEDATX = 0x20;
     UEDATX = 0;
     UEDATX = 0;
-    UEDATX = 0; // TODO: should this be 1 or 0 ???
+    UEDATX = 0; // 0 seems to work nicely.  what if this is 1??
     UEDATX = 0;
-    UEDATX = 2;
+    UEDATX = 1;
     UEDATX = 0;
     UEDATX = signals;
     UEDATX = 0;
