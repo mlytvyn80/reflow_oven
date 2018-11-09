@@ -503,30 +503,25 @@ void lcd_put_two_rows(const char *row1, const char *row2)
     lcd_puts(row2);    
 }
 
-
 void lcd_put_two_rows_animate(const char *row1, const char *row2)
 {
     lcd_clrscr();
     lcd_gotoxy(0, 0);
-    
-    uint8_t delay_ms = 50;
+
+    uint8_t x = 0;
+    uint8_t delay_ms = 100;
     
     for (uint8_t i=0; i<15; i++)
     {
-        lcd_gotoxy(i, 0);
-        lcd_puts("   ");
-        lcd_gotoxy(i, 0);
+        lcd_gotoxy(x, 0);
         lcd_putc(row1[i]);
-        
-        lcd_gotoxy(i, 1);
-        lcd_puts("   ");
-        lcd_gotoxy(i, 1);
+
+        lcd_gotoxy(x, 1);
         lcd_putc(row2[i]);
 
+	x++;
         delay(delay_ms);
     }
-
-
 }
 
 /*************************************************************************

@@ -29,7 +29,7 @@
   * Modified by Mykhailo Lytvyn
  */
 
-#define VERSION "2012-08-11/1"
+#define VERSION "2018-11-09/1"
 
 #include <avr/io.h>
 #include <avr/interrupt.h>
@@ -534,14 +534,14 @@ void avr_init(void)
     // Pullups
     PINB |= (1<<PB6);
     PINC |= (1<<PC6)|(1<<PC7);
-    
+
     // LED status lights
     DDRD |= (1<<PD5)|(1<<PD6)|(1<<PD7);
     DDRD |= (1<<PD3);
-    
+
     rled_on();
     relay_off();
-    
+
     usb_init();
 }
 
@@ -549,11 +549,11 @@ void show_greetings_msg(void)
 {
     lcd_clrscr();
 
-    lcd_put_two_rows_animate("REFLOW  OVEN", " CONTROLLER ");
-    _delay_ms(500);
-    
+    lcd_put_two_rows_animate("  REFLOW  OVEN ", "   CONTROLLER  ");
+    _delay_ms(1000);
+
     lcd_put_two_rows_animate("Mykhailo Lytvyn", "   lytvyn.at   ");
-    _delay_ms(500);
+    _delay_ms(1000);
 
     lcd_put_two_rows("FIRMWARE VERSION", VERSION);
 

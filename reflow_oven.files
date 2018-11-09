@@ -1,0 +1,15 @@
+firmware/lcd.c
+firmware/lcd.h
+firmware/oven_pid.c
+firmware/oven_pid.h
+firmware/oven_profile.c
+firmware/oven_profile.h
+firmware/oven_ssr.c
+firmware/oven_ssr.h
+firmware/oven_timing.c
+firmware/oven_timing.h
+firmware/ovencon.c
+firmware/thcouple.c
+firmware/thcouple.h
+firmware/usb_serial.c
+firmware/usb_serial.h
