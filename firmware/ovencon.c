@@ -49,6 +49,7 @@
 #include "thcouple.h"
 #include "lcd.h"
 
+
 #define gled_on() PORTD |= _BV(5)
 #define gled_off() PORTD &= ~_BV(5)
 #define buzzer_on() PORTD |= _BV(6)
@@ -65,6 +66,8 @@ uint32_t Boot_Key __attribute__ ((section (".noinit")));
 #define MAGIC_BOOT_KEY            0xDC42ACCA
 #define BOOTLOADER_START_ADDRESS  0x7000
 
+#define SYNC_BYTE 0x24
+
 void Jump_To_Bootloader(void)
 {
     // Disable all interrupts
@@ -77,16 +80,24 @@ void Jump_To_Bootloader(void)
 }
 
 
+
 volatile uint8_t mode_manual;
 volatile int16_t manual_target;
 volatile uint8_t manual_target_changed;
 
-
+#define CMD_UNKNOWN 0
 #define CMD_RESET   1
 #define CMD_GO      2
 #define CMD_PAUSE   3
 #define CMD_RESUME  4
 #define CMD_MANUAL  5
+#define CMD_SET_COEFF 6
+#define CMD_SET_SHIFT 7
+#define CMD_GET_COEFF 8
+#define CMD_GET_SHIFT 9
+#define CMD_UPDATE    10
+
+#define CMD_SYNC_BYTE 0x24 // Dollar sign
 
 // TODO: currently, only one comm_cmd can be processed per oven_update_4hz
 // invocation, so multiple commands received within a ~0.25s window may be lost
@@ -346,7 +357,7 @@ void oven_update_4hz(void)
                 state = ST_DONE;
                 buzzer = 8;
             }
-            if ((target - temp) > 100) // 25 *C difference
+            if ((target - temp) > 140) // 35 *C difference
                 fault();
             break;
         case ST_PAUSE:
@@ -466,48 +477,46 @@ void oven_update_4hz(void)
     time++;
 }
 
-char rx_msg[255];
-uint8_t rx_cnt;
 
-void process_message(const char *msg)
-{
-    // this is a ridiculously expensive function to invoke - a more efficient
-    // command parser could be implemented, or a binary protocol established -
-    // but, we're not expecting a lot of command traffic in this application,
-    // and all of the timing-critical routines are handled by interrupts, so
-    // there isn't a lot of downside to this expensive-but-easy implementation
-
-    uint16_t eeprom_data;
+void process_message(uint8_t command, uint16_t value)
+{    
     char response[50];
     uint8_t resplen;
 
-    if(strcmp_P(msg,PSTR("reset")) == 0) {
-        comm_cmd = CMD_RESET;
-    } else if(strcmp_P(msg,PSTR("go")) == 0) {
-        comm_cmd = CMD_GO;
-    } else if(strcmp_P(msg,PSTR("pause")) == 0) {
-        comm_cmd = CMD_PAUSE;
-    } else if(strcmp_P(msg,PSTR("resume")) == 0) {
-        comm_cmd = CMD_RESUME;
-    } else if(strcmp_P(msg,PSTR("update")) == 0) { // update firmware via USB        
-        lcd_put_two_rows("FIRMWARE UPDATE", "RESTART TO ABORT");
-        usb_serial_write((void*)"* Update firmware with Atmel FLIP", 33);
-        usb_serial_flush_output();
-        Jump_To_Bootloader();
-    } else if(sscanf_P(msg,PSTR("coeff: %d"), &eeprom_data)) { // TH couple correction coefficient, default 31
-        set_coeff(eeprom_data);
-        resplen = sprintf_P(response, PSTR("* Coeff: %d\n"), th_coeff);
-        usb_serial_write((void*)response, resplen);
-    } else if(sscanf_P(msg,PSTR("shift: %d"), &eeprom_data)) { // TMP37 cold junction zero shift, default 0
-        set_zero(eeprom_data);
-        resplen = sprintf_P(response, PSTR("* Shift: %d\n"), zero_shift);
-        usb_serial_write((void*)response, resplen);
-    } else if(strcmp_P(msg,PSTR("coeff?")) == 0) {
-        resplen = sprintf_P(response, PSTR("* Coeff: %d\n"), th_coeff);
-        usb_serial_write((void*)response, resplen);
-    } else if(strcmp_P(msg,PSTR("shift?")) == 0) {
-        resplen = sprintf_P(response, PSTR("* Shift: %d\n"), zero_shift);
-        usb_serial_write((void*)response, resplen);
+    switch(command)
+    {
+        case (CMD_RESET) :
+        case (CMD_GO) :
+        case (CMD_PAUSE) :
+        case (CMD_RESUME) :
+            comm_cmd = command;
+            break;
+        case (CMD_UPDATE) :
+            lcd_put_two_rows("FIRMWARE UPDATE", "RESTART TO ABORT");
+            usb_serial_write((void*)"* Update firmware with Atmel FLIP", 33);
+            usb_serial_flush_output();
+            Jump_To_Bootloader();
+            break;
+        case (CMD_SET_COEFF):
+            set_coeff(value);
+            resplen = sprintf_P(response, PSTR("* Coeff: %d\n"), th_coeff);
+            usb_serial_write((void*)response, resplen);
+            break;
+        case (CMD_SET_SHIFT):
+            set_zero(value);
+            resplen = sprintf_P(response, PSTR("* Shift: %d\n"), zero_shift);
+            usb_serial_write((void*)response, resplen);
+            break;
+        case (CMD_GET_COEFF):
+            resplen = sprintf_P(response, PSTR("* Coeff: %d\n"), th_coeff);
+            usb_serial_write((void*)response, resplen);
+            break;
+        case (CMD_GET_SHIFT):
+            resplen = sprintf_P(response, PSTR("* Shift: %d\n"), zero_shift);
+            usb_serial_write((void*)response, resplen);
+            break;
+        default:
+            break;
     }
 }
 
@@ -550,6 +559,46 @@ void show_greetings_msg(void)
 
 }
 
+
+void read_serial_data(uint8_t* buf, uint8_t *bytes_in_buffer)
+{
+    if(usb_configured())
+    {
+        uint8_t received_char = -1;
+        uint8_t bytes_to_be_read = usb_serial_available();
+
+        while(bytes_to_be_read > 0)
+        {
+            received_char = usb_serial_getchar();
+
+            if(received_char != -1 && received_char != '\r')
+            {
+                if(received_char == '\n' && buf[0] == (uint8_t)SYNC_BYTE && *bytes_in_buffer == 4)
+                {
+                    uint16_t value =  ((uint16_t)buf[2] << 8) | buf[3];
+                    process_message(buf[1], value);
+                    buf[1] = CMD_UNKNOWN;
+                    bytes_in_buffer = 0;
+                }
+
+                if(received_char == SYNC_BYTE)
+                {
+                    buf[0] = SYNC_BYTE;
+                    buf[1] = CMD_UNKNOWN;
+                    *bytes_in_buffer = 1;
+                }
+                else if(*bytes_in_buffer <= 3)
+                {
+                    buf[*bytes_in_buffer] = received_char;
+                    *bytes_in_buffer += 1;
+                }
+            }
+
+            bytes_to_be_read--;
+        }
+    }
+}
+
 // program entry point
 int main(void)
 {
@@ -560,7 +609,7 @@ int main(void)
     show_greetings_msg();
     
     oven_setup();
-
+        
     // wait an arbitrary bit for the host to complete its side of the init
     _delay_ms(1000);
 
@@ -570,30 +619,12 @@ int main(void)
     rled_off();
     gled_on();
     
-    rx_cnt = 0;
+    uint8_t buf[4];
+    uint8_t bytes_in_buffer = 0;
 
-    int8_t ret;
     while(1)
     {
-        // receive individual characters from the host
-        while( (ret = usb_serial_getchar()) != -1)
-        {
-            // all commands are terminated with a new-line
-            if(ret == '\n') 
-            {
-                // only process commands that haven't overflowed the buffer
-                if(rx_cnt > 0 && rx_cnt < 255) 
-                {
-                    rx_msg[rx_cnt] = '\0';
-                    process_message(rx_msg);
-                }
-                rx_cnt = 0;
-            } else {
-                // buffer received characters
-                rx_msg[rx_cnt] = ret;
-                if(rx_cnt != 255) rx_cnt++;
-            }
-        }
+        read_serial_data(buf, &bytes_in_buffer);
     }
 }
 

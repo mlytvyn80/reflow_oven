@@ -7,3 +7,8 @@ firmware/ovencon.hex
 firmware/ovencon.lss
 firmware/ovencon.map
 firmware/ovencon.sym
+*.creator.user
+firmware/reflow_owen.config
+firmware/reflow_owen.creator
+firmware/reflow_owen.files
+firmware/reflow_owen.includes

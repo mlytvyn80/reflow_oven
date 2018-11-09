@@ -251,7 +251,7 @@ struct usb_string_descriptor_struct {
 static const struct usb_string_descriptor_struct PROGMEM string0 = {
         4,
         3,
-{0x0409}
+        {0x0409}
 };
 static const struct usb_string_descriptor_struct PROGMEM string1 = {
         sizeof(STR_MANUFACTURER),
@@ -277,12 +277,12 @@ static const struct descriptor_list_struct {
         const uint8_t	*addr;
         uint8_t		length;
 } PROGMEM descriptor_list[] = {
-{0x0100, 0x0000, device_descriptor, sizeof(device_descriptor)},
-{0x0200, 0x0000, config1_descriptor, sizeof(config1_descriptor)},
-{0x0300, 0x0000, (const uint8_t *)&string0, 4},
-{0x0301, 0x0409, (const uint8_t *)&string1, sizeof(STR_MANUFACTURER)},
-{0x0302, 0x0409, (const uint8_t *)&string2, sizeof(STR_PRODUCT)},
-{0x0303, 0x0409, (const uint8_t *)&string3, sizeof(STR_SERIAL_NUMBER)}
+    {0x0100, 0x0000, device_descriptor, sizeof(device_descriptor)},
+    {0x0200, 0x0000, config1_descriptor, sizeof(config1_descriptor)},
+    {0x0300, 0x0000, (const uint8_t *)&string0, 4},
+    {0x0301, 0x0409, (const uint8_t *)&string1, sizeof(STR_MANUFACTURER)},
+    {0x0302, 0x0409, (const uint8_t *)&string2, sizeof(STR_PRODUCT)},
+    {0x0303, 0x0409, (const uint8_t *)&string3, sizeof(STR_SERIAL_NUMBER)}
 };
 #define NUM_DESC_LIST (sizeof(descriptor_list)/sizeof(struct descriptor_list_struct))
 
